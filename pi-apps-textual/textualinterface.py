@@ -17,7 +17,7 @@ def X_is_running():
     return p.returncode == 0
 
 class AppDisplay(Static):
-    app=None
+    selected_app=None
     piappsMD="""# Pi-Apps
 Let's be honest: **Linux is harder to master than Windows.** Sometimes it's not user-friendly, and following an outdated tutorial may break your Raspberry Pi's operating system.  
 There is no centralized software repository, except for the `apt` repositories which lack many desktop applications.  
@@ -46,7 +46,7 @@ Textualize Team"""
     def on_mount(self):
         self.add_class("no_display_app")
     def load_app(self,data):
-        self.app=data["name"]
+        self.selected_app=data["name"]
         data=self.pi_apps_instance.get_app_details(data)
         md=self.query_one("#APPMD")
         title="# "+data["name"]
@@ -68,16 +68,18 @@ Textualize Team"""
             self.add_class("uninstalled_app")
         md.update(title+"\n"+website+"\n"+"\n".join(data["description"]))
     def on_markdown_link_clicked(self, event: Markdown.LinkClicked) -> None:
-        if X_is_running:
+        if X_is_running():
             webbrowser.open(event.href)
     def on_button_pressed(self, event: Button.Pressed):
-        if app and False:
-            if event.id=="install_button":
-                with open(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),"a") as q:
-                    q.write("install;"+self.app)
-            elif event.id=="uninstall_button":
-                with open(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),"a") as q:
-                    q.write("uninstall;"+self.app)
+        if app:
+            if event.button.id=="install_button":
+                with open(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),"w") as q:
+                    q.write("install;"+self.selected_app)
+                    q.close()
+            elif event.button.id=="uninstall_button":
+                with open(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),"w") as q:
+                    q.write("uninstall;"+self.selected_app)
+                    q.close()
     def revert(self):
         md=self.query_one("#APPMD")
         cre=self.query_one("#credits")
@@ -87,7 +89,7 @@ Textualize Team"""
         self.remove_class("nocredits")
         md.update(self.piappsMD)
         cre.update(self.piappscredits)
-        self.app=None
+        self.selected_app=None
 
 class piapps(App):
     BINDINGS = [("d", "toggle_dark", "Toggle dark mode"),("q","quit","Exit")]
@@ -114,7 +116,7 @@ class piapps(App):
         self.title = "Pi-Apps"
         self.sub_title="Raspberry pi app store for open source projects"
         
-    """@on(TabbedContent.TabActivated)
+    #@on(TabbedContent.TabActivated)
     def mount_terminal(self):
         try:
             tph=self.query_one("#terminal_ph")
@@ -124,8 +126,9 @@ class piapps(App):
             term.start()
         except:
             pass
-    #def on_ready(self):
-    #    self.mount_terminal()"""
+    def on_ready(self):
+        self.mount_terminal()
+    
     def browseto(self,structure,place) -> list:
         if place==[""] or len(place)==0:
             return structure
@@ -146,8 +149,8 @@ class piapps(App):
         apps=self.browseto(self.structure,["All Apps"])
         dapps={}
         for app in apps:
-            dapps[app["name"]]=app
-        self.appframe.load_app(dapps[selected])
+            if app["name"]==selected:
+                self.appframe.load_app(app)
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         selected_option = event.option_id
         #with open("l.txt","w") as f: # log file
@@ -177,6 +180,7 @@ class piapps(App):
             self.appframe.revert()
         else:
             self.load_app(selected_option)
+    
     @on(Input.Changed)
     def search_for_app(self, event: Input.Changed):
         self.search=event.value
@@ -195,6 +199,7 @@ class piapps(App):
             page=self.get_page_infos(self.directory)
             ol.add_options([Option(e,id=e) for e in page])
             self.appframe.revert()
+
 if __name__ == "__main__":
     app = piapps()
     app.run()
