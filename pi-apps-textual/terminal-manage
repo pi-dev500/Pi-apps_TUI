@@ -1,0 +1,63 @@
+#!/bin/bash
+{
+DIRECTORY="$1"
+cd "$DIRECTORY"
+yad(){
+	echo "$@">yad-command
+	cat>yad-input
+}
+set -a
+info() {
+  echo -e "$(tput smul)$(tput setaf 6)$(tput bold)$1$(tput sgr0)"
+}
+
+error() {
+  echo -e "$(tput setaf 1)$(tput bold)$1$(tput sgr0)"
+  exit 1
+}
+refresh_list() { #Refresh the current list of apps in the event of a change
+        "${DIRECTORY}/etc/preload-daemon"
+}
+source "${DIRECTORY}/api" || error "failed to source ${DIRECTORY}/api"
+
+selfdir="$(readlink -f "$(dirname "$0")")"
+
+mkdir -p "${DIRECTORY}/data/manage-daemon"
+
+if [ -f "${DIRECTORY}/data/manage-daemon/pid" ];then
+    #check if PID is running
+    if process_exists $(cat "${DIRECTORY}/data/manage-daemon/pid") ;then
+		echo "$2">>"${DIRECTORY}/data/manage-daemon/queue"
+		exit 0
+    fi
+fi
+generate_logo
+echo $$>"${DIRECTORY}/data/manage-daemon/pid"
+"${DIRECTORY}/updater" set-status
+
+updatable_apps="$(cat "${DIRECTORY}/data/update-status/updatable-apps")"
+updatable_files="$(cat "${DIRECTORY}/data/update-status/updatable-apps")"
+
+if echo "$updatable_apps$updatable_files" | grep -v . ;then
+info "updatable files:"
+echo "$updatable_files"
+info "updatable apps:"
+echo "$updatable_apps"
+fi
+
+if [ ! -e "${DIRECTORY}/data/manage-daemon/queue" ];then
+    mkfifo "${DIRECTORY}/data/manage-daemon/queue"
+fi
+info "Waiting for user actions..."
+while true;do
+	fullaction="$(cat "${DIRECTORY}/data/manage-daemon/queue" | sed 's/^\( *[^ ]\+\);/\1 /')"
+	action="$(awk 'BEGIN {FS=";";}{print $1}')"
+	app="$(awk 'BEGIN {FS=";";}{print $2}')"
+	if [ "${action}" == "update" ] && [ "${app}" == "all" ];then
+		"${DIRECTORY}/updater" cli-yes
+	else
+		"${DIRECTORY}/manage" "${action}" "${app}"
+	fi
+	refresh_list
+done
+}

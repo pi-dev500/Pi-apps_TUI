@@ -1,0 +1,46 @@
+#Screen {
+    background: #202020;
+}
+AppDisplay {
+width: 2fr;
+}
+Terminal {
+height: 90%
+}
+#hello {
+    width: 100%;
+    column-span: 1;
+    content-align: center top;
+    text-style: bold;
+}
+#browser {
+width: 1fr;
+}
+#app_browser {
+height: 90%;
+}
+#actions {
+content-align: right middle;
+}
+.no_display_app #install_button {
+    display: none
+}
+
+.no_display_app #uninstall_button {
+    display: none
+}
+
+.uninstalled_app #uninstall_button {
+    display: none
+}
+
+.installed_app #install_button {
+    display: none
+}
+
+.nocredits #credits_collapsible {
+    display: none
+}
+#credits, #credits_collapsible {
+width: 100%
+}
