@@ -25,7 +25,6 @@ def parse_file_in_chunks(file_path, chunk_size=5):
 class PiAppsInstance:
     def __init__(self, pi_apps_path):
         self.path=pi_apps_path
-        self.apps=os.listdir(os.path.join(pi_apps_path,"apps"))
         dir_lookup_shell=subprocess.check_output("grep -w '    dir_lookup=' "+os.path.join(self.path,"preload"),shell=True).decode().split("=")
         dir_lookup_shell.pop(0)
         self.dir_lookup=eval("=".join(dir_lookup_shell).replace('( [','{').replace(')','}').replace('[',',').replace(']=',':'))
@@ -41,7 +40,7 @@ class PiAppsInstance:
                 parsed_element["value"]=element[2]
                 parsed_element["tooltip"]=element[3]
                 parsed_element["status_color"]=element[4]
-                if parsed_element["name"] in self.apps: # defines if it's an app or not
+                if not parsed_element["value"].endswith("/"): # defines if it's an app or not
                     parsed_element["type"]="Application"
                     if place=="All Apps/":
                         apps.append(parsed_element["name"])
