@@ -3,6 +3,7 @@
 }
 AppDisplay {
 width: 2fr;
+height: 100%;
 }
 Terminal {
 height: 90%
@@ -20,7 +21,8 @@ width: 1fr;
 height: 90%;
 }
 #actions {
-content-align: right middle;
+align: right bottom;
+max-height: 3;
 }
 .no_display_app #install_button {
     display: none
@@ -44,6 +46,4 @@ content-align: right middle;
 #credits, #credits_collapsible {
 width: 100%
 }
-Input {
 
-}

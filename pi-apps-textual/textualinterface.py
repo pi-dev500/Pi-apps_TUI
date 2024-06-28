@@ -8,6 +8,8 @@ import os
 import sys
 import webbrowser
 from PiAppsLIB import PiAppsInstance
+import asyncio
+from asyncio import Task
 self_directory=os.path.dirname(os.path.realpath(sys.argv[0]))
 
 def X_is_running():
@@ -36,13 +38,14 @@ Textualize Team"""
         self.pi_apps_instance=LIBinstance
         super().__init__()
     def compose(self):
-        with VerticalScroll():
-            yield Markdown(self.piappsMD,id="APPMD")
-            with Collapsible(title="Credits",id='credits_collapsible'):
-                yield Label(self.piappscredits,id="credits")
-        with Horizontal(id="actions"):
-            yield Button.success("Install", id="install_button")
-            yield Button.error("Uninstall", id="uninstall_button")
+        with Vertical():
+            with VerticalScroll():
+                yield Markdown(self.piappsMD,id="APPMD")
+                with Collapsible(title="Credits",id='credits_collapsible'):
+                    yield Label(self.piappscredits,id="credits")
+            with Horizontal(id="actions"):
+                yield Button.success("Install", id="install_button")
+                yield Button.error("Uninstall", id="uninstall_button")
     def on_mount(self):
         self.add_class("no_display_app")
     def load_app(self,data):
@@ -70,7 +73,7 @@ Textualize Team"""
     def on_markdown_link_clicked(self, event: Markdown.LinkClicked) -> None:
         if X_is_running():
             webbrowser.open(event.href)
-    def on_button_pressed(self, event: Button.Pressed):
+    async def on_button_pressed(self, event: Button.Pressed):
         if app:
             if event.button.id=="install_button":
                 with open(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),"w") as q:
@@ -129,24 +132,16 @@ class piapps(App):
     def on_ready(self):
         self.mount_terminal()
     
-    def browseto(self,structure,place) -> list:
-        if place==[""] or len(place)==0:
-            return structure
-        else:
-            thistime=place.pop(0)
-            for e in structure:
-                if e["name"]==thistime:
-                    return self.browseto(e["content"],place)
     def get_page_infos(self,place="") -> list:
         self.directory_data={}
-        for e in self.browseto(self.structure,place.split('/')):
+        for e in self.lib.get_structure(place):
             self.directory_data[e['name']]=e
         if place=="":
             return list(self.directory_data.keys())
         else:
             return ['← Back'] + list(self.directory_data.keys())
     def load_app(self, selected)->None:
-        apps=self.browseto(self.structure,["All Apps"])
+        apps=self.lib.get_structure("All Apps")
         dapps={}
         for app in apps:
             if app["name"]==selected:
