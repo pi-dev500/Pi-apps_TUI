@@ -1,5 +1,5 @@
 # Pi-apps_TUI
-A new great semi-graphical TUI for pi-apps
+A new great semi-graphical TUI for pi-apps, based on Textual
 
 # Use:
 
@@ -14,3 +14,6 @@ pip:
 textual
 textual-terminal
 ```
+# Warning:
+
+This still have some bugs, use with caution. Don't spam the install or uninstall button, ubles you want it to freeze.
