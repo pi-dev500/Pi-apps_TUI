@@ -9,7 +9,8 @@ A new great semi-graphical TUI for pi-apps
 # Dependencies:
 
 ```
-python3
+python3+
+pip:
 textual
 textual-terminal
 ```
