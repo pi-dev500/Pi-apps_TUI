@@ -16,4 +16,4 @@ textual-terminal
 ```
 # Warning:
 
-This still have some bugs, use with caution. Don't spam the install or uninstall button, unless you want it to freeze.
+This still have some bugs, use with caution. This is in early stage.
