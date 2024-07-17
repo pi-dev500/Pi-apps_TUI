@@ -1,4 +1,4 @@
-from textual import on
+from textual import on, work
 from textual.app import App, ComposeResult
 from textual.widgets import Label, Button, Header, OptionList, DataTable, Input, Static, Markdown, Collapsible, Footer, TabbedContent, Placeholder
 from textual.widgets.option_list import Option
@@ -8,10 +8,18 @@ import os
 import sys
 import webbrowser
 from PiAppsLIB import PiAppsInstance
-import asyncio
-from asyncio import Task
 self_directory=os.path.dirname(os.path.realpath(sys.argv[0]))
+import time
+import asyncio
+import threading
 
+def write_file(file,text,mode: str ="a"):
+    with open(file,mode) as f:
+        f.write(text)
+def write_file_asynchronously(file,text,mode: str ="a"):
+    th=threading.Thread(target=write_file, args=(file,text,mode))
+    th.start()
+    return th
 def X_is_running():
     from subprocess import Popen, PIPE
     p = Popen(["xset", "-q"], stdout=PIPE, stderr=PIPE)
@@ -19,6 +27,7 @@ def X_is_running():
     return p.returncode == 0
 
 class AppDisplay(Static):
+    queue=[]
     selected_app=None
     piappsMD="""# Pi-Apps
 Let's be honest: **Linux is harder to master than Windows.** Sometimes it's not user-friendly, and following an outdated tutorial may break your Raspberry Pi's operating system.  
@@ -34,8 +43,8 @@ and many others...
 For this textual TUI:
 pi-dev500
 Textualize Team"""
-    def __init__(self,LIBinstance):
-        self.pi_apps_instance=LIBinstance
+    def __init__(self,lib):
+        self.pi_apps_instance=lib
         super().__init__()
     def compose(self):
         with Vertical():
@@ -44,10 +53,12 @@ Textualize Team"""
                 with Collapsible(title="Credits",id='credits_collapsible'):
                     yield Label(self.piappscredits,id="credits")
             with Horizontal(id="actions"):
-                yield Button.success("Install", id="install_button")
+                yield Button("Install", id="install_button")
                 yield Button.error("Uninstall", id="uninstall_button")
     def on_mount(self):
         self.add_class("no_display_app")
+    def on_ready(self):
+        self.queue_daemon()
     def load_app(self,data):
         self.selected_app=data["name"]
         data=self.pi_apps_instance.get_app_details(data)
@@ -73,16 +84,23 @@ Textualize Team"""
     def on_markdown_link_clicked(self, event: Markdown.LinkClicked) -> None:
         if X_is_running():
             webbrowser.open(event.href)
-    async def on_button_pressed(self, event: Button.Pressed):
-        if app:
-            if event.button.id=="install_button":
-                with open(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),"w") as q:
-                    q.write("install;"+self.selected_app)
-                    q.close()
-            elif event.button.id=="uninstall_button":
-                with open(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),"w") as q:
-                    q.write("uninstall;"+self.selected_app)
-                    q.close()
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if self.selected_app:
+            match event.button.id:
+                case "install_button":
+                    action="install-if-not-installed"
+                case "uninstall_button":
+                    action="uninstall"
+                case default:
+                    action="check-all"
+            self.queue.append(action+";"+self.selected_app)
+    @work(exclusive=False)
+    async def queue_daemon(self) -> None:
+        while True:
+            await asyncio.sleep(0.1)
+            while len(self.queue)!=0:
+                write_file_asynchronously(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),str(self.queue.pop(0))+"\n")
+                
     def revert(self):
         md=self.query_one("#APPMD")
         cre=self.query_one("#credits")
@@ -111,15 +129,14 @@ class piapps(App):
                     yield OptionList(*[Option(e,id=e) for e in self.get_page_infos()],id="app_browser")
                 self.appframe=AppDisplay(self.lib)
                 yield self.appframe
-            with Vertical(id="TermLayout"):
+            with VerticalScroll(id="TermLayout"):
                 yield Label("The manage log will be shown there:", id="termlabel")
                 yield Placeholder("Waiting for terminal..", id="terminal_ph")
         yield Footer()
     def on_mount(self) -> None:
         self.title = "Pi-Apps"
         self.sub_title="Raspberry pi app store for open source projects"
-        
-    #@on(TabbedContent.TabActivated)
+    
     def mount_terminal(self):
         try:
             tph=self.query_one("#terminal_ph")
@@ -131,7 +148,7 @@ class piapps(App):
             pass
     def on_ready(self):
         self.mount_terminal()
-    
+        self.appframe.on_ready()
     def get_page_infos(self,place="") -> list:
         self.directory_data={}
         for e in self.lib.get_structure(place):
@@ -142,7 +159,6 @@ class piapps(App):
             return ['← Back'] + list(self.directory_data.keys())
     def load_app(self, selected)->None:
         apps=self.lib.get_structure("All Apps")
-        dapps={}
         for app in apps:
             if app["name"]==selected:
                 self.appframe.load_app(app)
