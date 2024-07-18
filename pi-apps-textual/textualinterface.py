@@ -10,16 +10,27 @@ import webbrowser
 from PiAppsLIB import PiAppsInstance
 self_directory=os.path.dirname(os.path.realpath(sys.argv[0]))
 import time
-import asyncio
 import threading
 
-def write_file(file,text,mode: str ="a"):
-    with open(file,mode) as f:
-        f.write(text)
-def write_file_asynchronously(file,text,mode: str ="a"):
-    th=threading.Thread(target=write_file, args=(file,text,mode))
-    th.start()
-    return th
+class fifo_worker:
+    to_write=[]
+    append=to_write.append
+    run=True
+    def __init__(self, file,parent):
+        self.parent=parent
+        self.filename=file
+        self.mode="a"
+        self.Dthread=threading.Thread(target=self.daemon)
+        self.Dthread.start()
+    def daemon(self):
+        while self.run:
+            time.sleep(0.1)
+            while len(self.to_write)>0:
+                with open(self.filename, self.mode) as f:
+                    f.write(str(self.to_write.pop(0)))
+    def stop(self):
+        self.run=False
+    
 def X_is_running():
     from subprocess import Popen, PIPE
     p = Popen(["xset", "-q"], stdout=PIPE, stderr=PIPE)
@@ -27,7 +38,7 @@ def X_is_running():
     return p.returncode == 0
 
 class AppDisplay(Static):
-    queue=[]
+    
     selected_app=None
     piappsMD="""# Pi-Apps
 Let's be honest: **Linux is harder to master than Windows.** Sometimes it's not user-friendly, and following an outdated tutorial may break your Raspberry Pi's operating system.  
@@ -45,6 +56,7 @@ pi-dev500
 Textualize Team"""
     def __init__(self,lib):
         self.pi_apps_instance=lib
+        self.queue=fifo_worker(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),self)
         super().__init__()
     def compose(self):
         with Vertical():
@@ -53,12 +65,10 @@ Textualize Team"""
                 with Collapsible(title="Credits",id='credits_collapsible'):
                     yield Label(self.piappscredits,id="credits")
             with Horizontal(id="actions"):
-                yield Button("Install", id="install_button")
+                yield Button.success("Install", id="install_button")
                 yield Button.error("Uninstall", id="uninstall_button")
     def on_mount(self):
         self.add_class("no_display_app")
-    def on_ready(self):
-        self.queue_daemon()
     def load_app(self,data):
         self.selected_app=data["name"]
         data=self.pi_apps_instance.get_app_details(data)
@@ -93,14 +103,7 @@ Textualize Team"""
                     action="uninstall"
                 case default:
                     action="check-all"
-            self.queue.append(action+";"+self.selected_app)
-    @work(exclusive=False)
-    async def queue_daemon(self) -> None:
-        while True:
-            await asyncio.sleep(0.1)
-            while len(self.queue)!=0:
-                write_file_asynchronously(os.path.join(self.pi_apps_instance.path,"data","manage-daemon","queue"),str(self.queue.pop(0))+"\n")
-                
+            self.queue.append(action+";"+self.selected_app)   
     def revert(self):
         md=self.query_one("#APPMD")
         cre=self.query_one("#credits")
@@ -148,7 +151,6 @@ class piapps(App):
             pass
     def on_ready(self):
         self.mount_terminal()
-        self.appframe.on_ready()
     def get_page_infos(self,place="") -> list:
         self.directory_data={}
         for e in self.lib.get_structure(place):
@@ -213,4 +215,9 @@ class piapps(App):
 
 if __name__ == "__main__":
     app = piapps()
-    app.run()
+    try:
+        app.run()
+    except Exception as e:
+        app.appframe.queue.stop()
+        raise e
+    app.appframe.queue.stop()
